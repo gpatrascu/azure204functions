@@ -1,0 +1,37 @@
+POST http://localhost:7071/api/Invoices HTTP/1.1
+content-type: application/json
+
+{
+    "clientName": "George Patrascu",
+    "emailAddress": "george.patrascu@yahoo.com",
+    "invoiceAddress": "somewhere in Iasi",
+    "value": "121.12"
+}
+
+###
+
+GET http://localhost:7071/api/Invoices/E2C4F65F-6C79-4B35-AA18-5948B682B6C5 HTTP/1.1
+
+###
+
+GET http://localhost:7071/api/Invoices HTTP/1.1
+
+###
+
+POST https://azure204functionsdedicated.azurewebsites.net/api/invoices HTTP/1.1
+content-type: application/json
+
+{
+    "clientName": "George Patrascu",
+    "emailAddress": "george.patrascu@yahoo.com",
+    "invoiceAddress": "somewhere in Iasi",
+    "value": "121.12"
+}
+
+###
+
+GET https://azure204functionsdedicated.azurewebsites.net/api/invoices/E2C4F65F-6C79-4B35-AA18-5948B682B6C5 HTTP/1.1
+
+###
+
+GET https://azure204functionsdedicated.azurewebsites.net/api/invoices HTTP/1.1

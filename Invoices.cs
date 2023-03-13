@@ -1,39 +1,94 @@
-using System.Net;
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Azure.WebJobs.Extensions.Sql;
 
-namespace Thoughtworks.AzureStudy
+namespace AzureStudyGroup
 {
-    public class InvoicesFunctions
+    public static class Invoices
     {
-        private readonly ILogger _logger;
-
-        public InvoicesFunctions(ILoggerFactory loggerFactory)
+        [FunctionName("PostInvoices")]
+        public static async Task<IActionResult> PostInvoice(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "invoices")] HttpRequest req,
+            ILogger log,
+             [Sql("dbo.Invoices", "SqlConnectionString")] IAsyncCollector<Invoice> invoices)
         {
-            _logger = loggerFactory.CreateLogger<InvoicesFunctions>();
+            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            var data = JsonConvert.DeserializeObject<Invoice>(requestBody);
+            data.Id = Guid.NewGuid();
+
+            await invoices.AddAsync(data);
+            await invoices.FlushAsync();
+
+            return new OkObjectResult(data);
         }
 
-        [Function("Invoices")]
-        public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
+        [FunctionName("GetInvoiceById")]
+        public static IActionResult GetInvoiceById(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "invoices/{id:guid}")] HttpRequest req,
+            ILogger log,
+             [Sql("select * from dbo.Invoices where Id = @Id",
+             "SqlConnectionString",
+                System.Data.CommandType.Text,
+                "@Id={id}")] IEnumerable<Invoice> invoices)
         {
-            _logger.LogInformation("C# HTTP trigger function processed a request.");
+            return new OkObjectResult(invoices.FirstOrDefault());
+        }
 
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+        [FunctionName("GetInvoices")]
+        public static IActionResult GetInvoices(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "invoices")] HttpRequest req,
+            ILogger log,
+             [Sql("select * from dbo.Invoices",
+             "SqlConnectionString")] IEnumerable<Invoice> invoices)
+        {
+            return new OkObjectResult(invoices);
+        }
 
-            response.WriteString("Welcome to Azure Functions!");
+        [FunctionName("NewInvoiceTrigger")]
+        public static void Run(
+            [SqlTrigger("[dbo].[Invoices]", "SqlConnectionString")]
+            IReadOnlyList<SqlChange<Invoice>> changes,
+            ILogger logger)
+        {
+            foreach (SqlChange<Invoice> change in changes)
+            {
+                Invoice invoice = change.Item;
+                logger.LogCritical($"Change operation: {change.Operation}");
 
-            return response;
+                logger.LogCritical($"Simulate email sent to {invoice.EmailAddress}. Invoice value = {invoice.Value}");
+            }
         }
     }
 
-    public class Invoice{
-        public Guid Id {get; set;}
-        public string ClientName {get; set;}
-        public string EmailAddress {get; set;}
-        public string InvoiceAddress {get; set;}
-        public decimal Value{get;set;}
+    /*
+
+    CREATE TABLE [dbo].[Invoices](
+        [id] [uniqueidentifier] NOT NULL,
+        [clientName] [varchar](max) NOT NULL,
+        [emailAddress] [varchar](max) NOT NULL,
+        [invoiceAddress] [varchar](max) NOT NULL,
+        [value] [decimal](18, 2) NOT NULL
+    ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+    */
+    public class Invoice
+    {
+        public Guid Id { get; set; }
+        public string ClientName { get; set; }
+
+        public string EmailAddress { get; set; }
+
+        public string InvoiceAddress { get; set; }
+
+        public decimal Value { get; set; }
 
     }
 }
